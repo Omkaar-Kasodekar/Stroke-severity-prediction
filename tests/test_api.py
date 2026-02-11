@@ -18,8 +18,19 @@ def _get_engine():
 def _reset_db() -> None:
     """Truncate predictions table between tests to get deterministic results."""
     engine = _get_engine()
+    # Use dialect-appropriate truncation/cleanup so tests work with SQLite or Postgres
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE predictions RESTART IDENTITY;"))
+        dialect = engine.dialect.name
+        if dialect == "sqlite":
+            # Delete rows and reset sqlite sequence (if present)
+            conn.execute(text("DELETE FROM predictions;"))
+            # Reset autoincrement counter (only if table exists)
+            try:
+                conn.execute(text("DELETE FROM sqlite_sequence WHERE name='predictions';"))
+            except:
+                pass  # sqlite_sequence may not exist if predictions table is empty
+        else:
+            conn.execute(text("TRUNCATE TABLE predictions RESTART IDENTITY;"))
 
 
 def setup_function() -> None:
